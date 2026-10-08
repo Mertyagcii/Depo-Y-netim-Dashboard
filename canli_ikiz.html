@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{--kd:#1c1d20;--lime:#d9f23b;--mut:#6b7076;--ln:#ececE8}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:transparent;font-family:'Outfit','Segoe UI',system-ui,sans-serif;color:var(--kd)}
+  .hud{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+  .tile{background:#fff;border:1px solid var(--ln);border-radius:14px;padding:10px 14px}
+  .tile.k{background:var(--kd);color:#fff;border-color:var(--kd)}
+  .tile .a{font-size:.74rem;color:var(--mut)}.tile.k .a{color:#c9cbce}
+  .tile .b{font-size:1.5rem;font-weight:700;line-height:1.2}
+  .tile .c{font-size:.7rem;color:var(--mut)}
+  .main{display:flex;gap:12px;flex-wrap:wrap}
+  .sol{flex:1 1 640px;min-width:300px}
+  .sag{flex:0 0 310px;display:flex;flex-direction:column;gap:10px;min-width:260px;flex-grow:1;max-width:100%}
+  .card{background:#fff;border:1px solid var(--ln);border-radius:16px;padding:10px;position:relative}
+  canvas{width:100%;display:block;border-radius:10px;background:#fbfbf9}
+  .bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+  .live{display:inline-flex;align-items:center;gap:6px;background:var(--kd);color:#fff;border-radius:99px;padding:4px 12px;font-size:.78rem;font-weight:600}
+  .live i{width:8px;height:8px;border-radius:50%;background:#ef4444;animation:p 1.2s infinite}
+  @keyframes p{0%{opacity:1}50%{opacity:.25}100%{opacity:1}}
+  button{font:inherit;background:#fff;border:1px solid #dcdcd6;border-radius:99px;padding:3px 12px;cursor:pointer;font-size:.78rem}
+  button.on{background:var(--kd);color:#fff;border-color:var(--kd)}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.72rem;color:var(--mut);margin-top:6px}
+  .legend b{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  h4{margin:0 0 6px;font-size:.88rem}
+  #ticker{height:250px;overflow:hidden;font-size:.76rem}
+  #ticker div{padding:5px 8px;border-radius:8px;margin-bottom:4px;background:#f6f6f3;animation:in .4s}
+  #ticker div span{color:var(--mut);margin-right:6px;font-variant-numeric:tabular-nums}
+  #ticker .t1{background:#e6f4ea}#ticker .t2{background:#e3edff}#ticker .t3{background:#fff0d6}
+  @keyframes in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+  #fl{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;font-size:.72rem}
+  .fr{display:grid;grid-template-columns:44px 1fr 32px;gap:6px;align-items:center;margin-bottom:3px}
+  .pb{height:6px;border-radius:9px;background:#ececE8;overflow:hidden}.pb i{display:block;height:100%;background:#8fb413}
+  #kriz{display:none;background:#fde4e4;border:1px solid #f5b5b5;color:#a82c2c;border-radius:12px;padding:8px 14px;margin-bottom:10px;font-weight:600;font-size:.88rem}
+  #repbar{display:none;align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap}
+  #repbar input[type=range]{flex:1 1 220px;accent-color:#8fb413}
+  .live.gecmis{background:#3b82f6}.live.gecmis i{background:#fff}
+  #tip{position:fixed;pointer-events:none;background:var(--kd);color:#fff;font-size:.74rem;padding:6px 9px;border-radius:8px;display:none;z-index:9}
+  @media(max-width:700px){.hud{grid-template-columns:repeat(2,1fr)}.sag{flex-basis:100%}}
+</style>
+</head>
+<body>
+<div id="kriz"></div>
+<div class="hud">
+  <div class="tile k"><div class="a">Aktif araç</div><div class="b" id="k1">–</div><div class="c" id="k1c">forklift / MHE</div></div>
+  <div class="tile"><div class="a">Kapı doluluğu</div><div class="b" id="k2">–</div><div class="c" id="k2c">yanaşmış kamyon / kapı</div></div>
+  <div class="tile"><div class="a" id="k3a">Son 10 dk palet hareketi</div><div class="b" id="k3">–</div><div class="c" id="k3c">toplama + yerleştirme</div></div>
+  <div class="tile"><div class="a" id="k4a">Bugün sevk edilen satır</div><div class="b" id="k4">–</div><div class="c" id="k4c">toplam adet</div></div>
+</div>
+<div class="main">
+  <div class="sol card">
+    <div class="bar">
+      <span class="live"><i></i>CANLI</span><b id="clock" style="font-variant-numeric:tabular-nums"></b>
+      <span style="flex:1"></span>
+      <span style="font-size:.74rem;color:var(--mut)">Hız:</span>
+      <span id="hizbar"><button data-s="1">1×</button><button data-s="4" class="on">4×</button><button data-s="10">10×</button></span>
+    </div>
+    <div id="repbar"><button id="rp" class="on">⏸ Duraklat</button>
+      <span style="font-size:.74rem;color:var(--mut)">Oynatma hızı:</span>
+      <button data-r="300">300×</button><button data-r="900" class="on">900×</button><button data-r="3600">3600×</button>
+      <input type="range" id="rs" min="0" max="86399" value="21600"><b id="rsy" style="font-variant-numeric:tabular-nums"></b></div>
+    <canvas id="c"></canvas>
+    <div class="legend" id="legend"></div>
+  </div>
+  <div class="sag">
+    <div class="card"><h4>Canlı olay akışı</h4><div id="ticker"></div></div>
+    <div class="card"><h4>Araç durumu · pil</h4><div id="fl"></div></div>
+  </div>
+</div>
+<div id="tip"></div>
+<script>
+const F = __FEED__;
+const G = F.g, EN = G.en, BOY = G.boy, MY = 13;                 // MY: bina dışı yol şeridi (m)
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const loadMs = Date.now();
+const nowSrv = () => F.t0 + (Date.now() - loadMs) / 1000;        // sunucu saatine göre şimdi (sn)
+const REP = F.mod === 'replay';                                   // geçmiş oynatma modu
+let repT = REP ? F.replay.t0 + 6*3600 : 0, repOynat = true, repHiz = 900, rp = 0;
+const REPO = REP ? F.replay.olaylar : [];
+const simdi = () => REP ? repT : nowSrv();                        // olay/kamyon/saat için sanal ya da gerçek zaman
+let faktor = 4, scale = 1, dpr = window.devicePixelRatio || 1;
+const TIP_RENK = {'Reach truck':'#2563eb','Karşı ağırlıklı forklift':'#f59e0b','Elektrikli transpalet':'#16a34a','Order picker':'#8b5cf6'};
+const BLOK_RENK = {sevkiyat:'#dbeafe',paketleme:'#e0e7ff',ofis:'#e5e7eb',mal_kabul:'#dcfce7',kalite:'#fef9c3',iade:'#fee2e2',sarj:'#ccfbf1',depolama:'#f4f4f1'};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad2 = n => String(n).padStart(2,'0');
+const fmt = s => { const d = new Date(s*1000); return pad2(d.getUTCHours())+':'+pad2(d.getUTCMinutes())+':'+pad2(d.getUTCSeconds()); };
+const TZ = F.tz_ofset;                                            // yerel saat ofseti (sn)
+
+// ---- araçlar: rota uzunlukları ----
+const FL = F.forklift.map((f, i) => {
+  const cum = [0]; for (let k = 1; k < f.nok.length; k++) cum.push(cum[k-1] + Math.abs(f.nok[k][0]-f.nok[k-1][0]) + Math.abs(f.nok[k][1]-f.nok[k-1][1]));
+  return Object.assign({}, f, {cum, L: cum[cum.length-1], faz: i * cum[cum.length-1] / Math.max(F.forklift.length,1), iz: [], x:0, y:0, ang:0, yuklu:0, prev:null});
+});
+function konum(f, sAbs){
+  const s = ((sAbs % f.L) + f.L) % f.L;
+  let lo = 0, hi = f.cum.length - 1;
+  while (hi - lo > 1){ const m = (lo+hi)>>1; if (f.cum[m] <= s) lo = m; else hi = m; }
+  const a = f.nok[lo], b = f.nok[lo+1], seg = f.cum[lo+1]-f.cum[lo], o = seg ? (s-f.cum[lo])/seg : 0;
+  return {x:a[0]+(b[0]-a[0])*o, y:a[1]+(b[1]-a[1])*o, yuk:f.yuk[lo], ang:Math.atan2(b[1]-a[1], b[0]-a[0])};
+}
+const pilDeger = (i, f, t) => { const dg = f.pil_saat*60; return 100 - (((t/60 + i*47) % dg) / dg) * 80; };
+
+// ---- bölge ısısı ----
+const heat = {}; F.zonlar.forEach(z => heat[z.b] = 0);
+const log = [];                                                   // {t, metin, sinif}
+let c10 = [];                                                     // son 10 dk hareket zamanları (sunucu sn)
+function olay(t, metin, sinif){ log.push({t, metin, sinif}); }
+function forkOlay(f, ev, tGercek){
+  if (!ev) return;
+  const k = ev[0], a = ev[1];
+  const taze = tGercek > nowSrv()-4;
+  if (k === 'topla'){ if (taze) heat[a] = (heat[a]||0) + 1; c10.push(tGercek); olay(tGercek, esc(f.id)+' · Bölge '+esc(a)+"'dan palet aldı", 't1'); }
+  else if (k === 'yerlestir'){ if (taze) heat[a] = (heat[a]||0) + 1; c10.push(tGercek); olay(tGercek, esc(f.id)+' · Bölge '+esc(a)+"'a palet yerleştirdi", 't2'); }
+  else if (k === 'sevk') olay(tGercek, esc(f.id)+' · palet sevkiyat kapısına teslim edildi', 't1');
+  else if (k === 'al') olay(tGercek, esc(f.id)+' · mal kabul kapısından palet aldı', 't2');
+}
+function tara(f, sOnce, sSonra, tSonra){                          // iki mesafe arasındaki düğüm olaylarını yayınla
+  if (sSonra <= sOnce) return;
+  const c0 = Math.floor(sOnce / f.L), c1 = Math.floor(sSonra / f.L);
+  for (let c = c0; c <= c1; c++) for (let k = 1; k < f.cum.length; k++){
+    const s = c*f.L + f.cum[k];
+    if (s > sOnce && s <= sSonra && f.ev[k]) forkOlay(f, f.ev[k], tSonra - (sSonra - s)/(f.hiz*faktor));
+  }
+}
+// geçmiş: son 150 sn gerçek zaman
+(function(){ if (REP) { FL.forEach(f => f.prev = nowSrv()*faktor*f.hiz + f.faz); return; } const t = nowSrv();
+  FL.forEach(f => { if (f.ariza) return; const s1 = t*faktor*f.hiz + f.faz, s0 = (t-150)*faktor*f.hiz + f.faz; tara(f, s0, s1, t); f.prev = s1; });
+})();
+
+// ---- kamyonlar ----
+const TR = 9;                                                     // yaklaşma/ayrılma süresi (sn)
+const kapiXY = {in: F.kapi_in, out: F.kapi_out};
+const trLog = new Set();
+function kamyonDurum(k, t){
+  const a = k.t - TR, b = k.t, c = k.t + k.sure, d = c + TR;
+  if (t < a || t > d) return null;
+  if (t < b) return {faz:'yanasiyor', p:(t-a)/TR, ilerleme:0};
+  if (t <= c) return {faz:'bosaltiyor', p:1, ilerleme:(t-b)/k.sure};
+  return {faz:'ayriliyor', p:1-(t-c)/TR, ilerleme:1};
+}
+function kamyonOlaylari(t){
+  F.kamyon.forEach((k, i) => {
+    const anahtar = (n) => i+':'+n;
+    if (t >= k.t && !trLog.has(anahtar(1))){ trLog.add(anahtar(1)); if (t - k.t < 200) olay(k.t, 'Kamyon '+esc(k.plaka)+' · '+(k.tur==='in'?'mal kabul':'sevkiyat')+' kapı '+(k.kapi+1)+"'e yanaştı ("+k.palet+' palet)', 't3'); }
+    if (t >= k.t+k.sure && !trLog.has(anahtar(2))){ trLog.add(anahtar(2)); if (t - k.t - k.sure < 200) olay(k.t+k.sure, 'Kamyon '+esc(k.plaka)+' · '+(k.tur==='in'?'boşaltma':'yükleme')+' tamamlandı', 't3'); }
+  });
+}
+
+// ---- çizim ----
+function boyutla(){
+  const W = cv.parentElement.clientWidth - 20;
+  scale = W / EN; const H = (BOY + 2*MY) * scale;
+  cv.style.height = H + 'px'; cv.width = W*dpr; cv.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+const X = x => x*scale, Y = y => (BOY + MY - y) * scale;          // metre -> piksel (y yukarı)
+function karistir(a, b, t){ const pa=a.match(/\w\w/g).map(h=>parseInt(h,16)), pb=b.match(/\w\w/g).map(h=>parseInt(h,16));
+  return 'rgb('+pa.map((v,i)=>Math.round(v+(pb[i]-v)*t)).join(',')+')'; }
+function rect(x, y, w, h, fill, stroke, lw){ ctx.beginPath(); ctx.rect(X(x), Y(y+h), w*scale, h*scale); if(fill){ctx.fillStyle=fill;ctx.fill();} if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw||1;ctx.stroke();} }
+function yazi(t, x, y, boy, renk, hiza){ ctx.fillStyle = renk||'#334155'; ctx.font = (boy||11)+"px 'Outfit','Segoe UI',sans-serif"; ctx.textAlign = hiza||'center'; ctx.textBaseline='middle'; ctx.fillText(t, x, y); }
+
+function ciz(t, dt){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  // yol şeritleri
+  rect(0,-MY+1, EN, MY-1, '#eceae4'); rect(0, BOY, EN, MY-1, '#eceae4');
+  yazi('SEVKİYAT YOLU', X(EN/2), Y(-MY/2), 10, '#9a9a92'); yazi('MAL KABUL YOLU', X(EN/2), Y(BOY+MY/2), 10, '#9a9a92');
+  // bloklar
+  G.bloklar.forEach(b => { if (b.tur==='depolama'){ rect(b.x,b.y,b.w,b.d,BLOK_RENK.depolama); return; }
+    rect(b.x,b.y,b.w,b.d,BLOK_RENK[b.tur],'#a8b0bd',1); yazi(b.ad, X(b.x+b.w/2), Y(b.y+b.d/2)-6, Math.max(9,scale*1.5), '#475569'); yazi(Math.round(b.alan)+' m²', X(b.x+b.w/2), Y(b.y+b.d/2)+8, Math.max(8,scale*1.25), '#7b8494'); });
+  // raf bölgeleri + ısı
+  F.zonlar.forEach(z => { const h = Math.min((heat[z.b]||0)/3, 1);
+    rect(z.x,z.y,z.w,z.d, karistir('e9edf3','f59e0b',h), h>0.05?'#c2780c':'#9aa3b2', 1);
+    yazi(z.b, X(z.x+z.w/2), Y(z.y+z.d/2)-5, Math.max(10,scale*1.9), '#1c1d20'); yazi(z.abc+' sınıfı', X(z.x+z.w/2), Y(z.y+z.d/2)+8, Math.max(8,scale*1.2), '#6b7280'); });
+  rect(0,0,EN,BOY,null,'#1c1d20',2.5);
+  // kapılar
+  F.kapi_out.forEach(k => rect(k[0]-1.7,-0.6,3.4,1.2,'#2563eb','#fff',1));
+  F.kapi_in.forEach(k => rect(k[0]-1.7,BOY-0.6,3.4,1.2,'#16a34a','#fff',1));
+  // kamyonlar
+  let dolu = 0;
+  F.kamyon.forEach(k => { const d = kamyonDurum(k, simdi()); if(!d) return; if (d.faz==='bosaltiyor') dolu++;
+    const kx = (k.tur==='in'?F.kapi_in:F.kapi_out)[k.kapi][0], off = (1-d.p)*(MY-3);
+    const w = 3.2, l = 9, yt = k.tur==='in' ? BOY+0.8+off : -0.8-l-off;
+    const renk = k.tur==='in' ? '#16a34a' : '#2563eb';
+    ctx.globalAlpha = Math.min(1, d.p*1.5+0.2); rect(kx-w/2, yt, w, l, '#fff', renk, 2); rect(kx-w/2, yt+(k.tur==='in'?l*0.7:0), w, l*0.3, renk);
+    if (d.faz==='bosaltiyor'){ rect(kx-w/2+0.3, yt+(k.tur==='in'?0.4:l-0.9), (w-0.6)*d.ilerleme, 0.5, '#1c1d20'); }
+    ctx.globalAlpha = 1; yazi(k.plaka, X(kx), Y(yt+l/2), Math.max(7,scale*0.95), '#334155'); });
+  // forkliftler
+  const v = t*faktor;
+  FL.forEach((f, i) => {
+    if (f.ariza){                                                     // arızalı araç: yerinde, gri, kırmızı çarpı
+      const q = konum(f, f.faz), s0 = Math.max(10, 3.0*scale), qx = X(q.x), qy = Y(q.y); f.x=q.x; f.y=q.y; f.pil=0; f.yuklu=0;
+      ctx.fillStyle='#9ca3af'; ctx.strokeStyle='#dc2626'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(qx-s0/2,qy-s0*0.35,s0,s0*0.7,3); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(qx-s0*0.3,qy-s0*0.3); ctx.lineTo(qx+s0*0.3,qy+s0*0.3); ctx.moveTo(qx+s0*0.3,qy-s0*0.3); ctx.lineTo(qx-s0*0.3,qy+s0*0.3); ctx.stroke();
+      yazi('ARIZA', qx, qy-s0*0.9, 9, '#dc2626'); return; }
+    const sAbs = v*f.hiz + f.faz, p = konum(f, sAbs);
+    if (f.prev !== null && !REP){ tara(f, f.prev, sAbs, t); } f.prev = sAbs;
+    f.x=p.x; f.y=p.y; f.ang=p.ang; f.yuklu=p.yuk;
+    if (!f.sonIz || t - f.sonIz > 0.12/Math.max(faktor/4,1)){ f.iz.push([p.x,p.y]); if (f.iz.length>26) f.iz.shift(); f.sonIz=t; }
+    ctx.lineWidth = 1.5; for (let k=1;k<f.iz.length;k++){ ctx.strokeStyle='rgba(28,29,32,'+(k/f.iz.length*0.28)+')'; ctx.beginPath(); ctx.moveTo(X(f.iz[k-1][0]),Y(f.iz[k-1][1])); ctx.lineTo(X(f.iz[k][0]),Y(f.iz[k][1])); ctx.stroke(); }
+    const pil = pilDeger(i, f, t); f.pil = pil;
+    const s = Math.max(10, 3.0*scale), px = X(p.x), py = Y(p.y);
+    ctx.save(); ctx.translate(px, py); ctx.rotate(-p.ang);
+    ctx.fillStyle = TIP_RENK[f.tip] || '#64748b'; ctx.strokeStyle = pil<25 ? '#dc2626' : '#fff'; ctx.lineWidth = pil<25 ? 3 : 1.5;
+    ctx.beginPath(); ctx.roundRect(-s/2,-s*0.35,s,s*0.7,3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#1c1d20'; ctx.fillRect(s/2, -s*0.28, s*0.45, 2); ctx.fillRect(s/2, s*0.18, s*0.45, 2);
+    if (p.yuk){ ctx.fillStyle='#b9824a'; ctx.fillRect(s*0.55,-s*0.3,s*0.55,s*0.6); ctx.strokeStyle='#7a5226'; ctx.lineWidth=1; ctx.strokeRect(s*0.55,-s*0.3,s*0.55,s*0.6); }
+    ctx.restore();
+    if (scale > 6) yazi(f.id.slice(-2), px, py-s*0.85, 9, '#1c1d20');
+  });
+  // gerçek telemetri (API modu): araçlar bildirilen konumlarında çizilir
+  if (F.tel && F.tel.length) F.tel.forEach(f => { const s = Math.max(10, 3.0*scale);
+    ctx.fillStyle = TIP_RENK[f.tip] || '#64748b'; ctx.strokeStyle = (f.pil !== undefined && f.pil < 25) ? '#dc2626' : '#fff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(X(f.x)-s/2, Y(f.y)-s*0.35, s, s*0.7, 3); ctx.fill(); ctx.stroke();
+    if (f.durum === 'Yüklü'){ ctx.fillStyle = '#b9824a'; ctx.fillRect(X(f.x)+s*0.45, Y(f.y)-s*0.3, s*0.5, s*0.6); } });
+  const tv = simdi();
+  kamyonOlaylari(tv);
+  // HUD
+  const nTop = (F.tel && F.tel.length ? F.tel.length : FL.length), nAkt = (F.tel && F.tel.length ? F.tel.length : FL.filter(f => !f.ariza).length);
+  document.getElementById('k1').textContent = nAkt+' / '+nTop;
+  document.getElementById('k2').textContent = dolu+' / '+(F.kapi_in.length+F.kapi_out.length);
+  c10 = c10.filter(x => x > tv-600); document.getElementById('k3').textContent = c10.length;
+  document.getElementById('clock').textContent = fmt(tv + TZ);
+  Object.keys(heat).forEach(b => heat[b] *= Math.exp(-dt/14));
+}
+
+// ---- yan paneller ----
+let gosterilen = 0;
+function panel(){
+  const tk = document.getElementById('ticker');
+  log.sort((a,b)=>a.t-b.t);
+  while (gosterilen < log.length){ const o = log[gosterilen++]; const d = document.createElement('div'); d.className = o.sinif;
+    d.innerHTML = '<span>'+fmt(o.t+TZ)+'</span>'+o.metin; tk.insertBefore(d, tk.firstChild); while (tk.children.length > 14) tk.removeChild(tk.lastChild); }
+  document.getElementById('fl').innerHTML = FL.map(f => '<div class="fr"><b>'+esc(f.id)+'</b><div class="pb"><i style="width:'+Math.round(f.pil||0)+'%;background:'+((f.pil||0)<25?'#dc2626':'#8fb413')+'"></i></div><span>%'+Math.round(f.pil||0)+'</span></div>').join('');
+}
+document.getElementById('k4').textContent = F.bugun.satir.toLocaleString('tr-TR'); document.getElementById('k4c').textContent = F.bugun.adet.toLocaleString('tr-TR')+' adet';
+document.getElementById('legend').innerHTML = Object.entries(TIP_RENK).map(([k,v]) => '<span><b style="background:'+v+'"></b>'+k+'</span>').join('')
+  + '<span><b style="background:#b9824a"></b>palet</span><span><b style="background:#2563eb"></b>sevkiyat kapısı</span><span><b style="background:#16a34a"></b>mal kabul kapısı</span>'
+  + '<span><b style="background:#f59e0b"></b>sıcak = yoğun bölge</span>';
+document.querySelectorAll('button[data-s]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('button[data-s]').forEach(x => x.classList.remove('on')); b.classList.add('on');
+  const t = nowSrv(); const eski = faktor; faktor = +b.dataset.s;
+  FL.forEach(f => { f.prev = t*faktor*f.hiz + f.faz; });
+});
+// ---- ipucu ----
+const tip = document.getElementById('tip');
+cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  let en = null, ed = 14; FL.forEach(f => { const d = Math.hypot(X(f.x)-mx, Y(f.y)-my); if (d < ed){ ed = d; en = f; } });
+  if (en){ tip.style.display='block'; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px';
+    tip.innerHTML = '<b>'+esc(en.id)+'</b> · '+esc(en.tip)+'<br>'+(en.yuklu?'Yüklü':'Boş')+' · Pil %'+Math.round(en.pil||0); } else tip.style.display='none'; });
+cv.addEventListener('mouseleave', () => tip.style.display='none');
+
+window.addEventListener('resize', boyutla); boyutla();
+let son = performance.now(), sayac = 0;
+function repSar(t){
+  repT = Math.max(F.replay.t0, Math.min(F.replay.t1, t)); rp = 0; while (rp < REPO.length && REPO[rp].t <= repT - 1) rp++;
+  Object.keys(heat).forEach(b => heat[b] = 0); log.length = 0; gosterilen = 0; document.getElementById('ticker').innerHTML = ''; trLog.clear(); c10 = [];
+  for (let i = Math.max(0, rp - 600); i < rp; i++) if (REPO[i].t > repT - 600) c10.push(REPO[i].t);
+}
+function repIlerle(dt){
+  if (repOynat) repT = Math.min(F.replay.t1, repT + dt*repHiz);
+  while (rp < REPO.length && REPO[rp].t <= repT){ const e = REPO[rp++]; if (repT - e.t < 600) c10.push(e.t);
+    if (repT - e.t < 240){ heat[e.b] = (heat[e.b]||0) + 0.7; olay(e.t, 'Bölge '+esc(e.b)+' · '+e.n+' adet sevk · '+esc(e.k), 't1'); } }
+  const rs = document.getElementById('rs'); if (document.activeElement !== rs) rs.value = Math.round(repT - F.replay.t0);
+  document.getElementById('rsy').textContent = fmt(repT + TZ).slice(0,5);
+}
+function dongu(now){ const dt = Math.min((now-son)/1000, 0.2); son = now; if (REP) repIlerle(dt); ciz(nowSrv(), dt); if ((sayac++ % 20) === 0) panel(); requestAnimationFrame(dongu); }
+// ---- kriz şeridi ve oynatma kontrolleri ----
+if (F.kriz && F.kriz.metin){ const k = document.getElementById('kriz'); k.style.display = 'block'; k.textContent = '⚠ ' + F.kriz.metin;
+  FL.filter(f => f.ariza).forEach(f => olay(nowSrv(), '⚠ '+esc(f.id)+' arızalandı — görevden çıktı', 't3')); }
+if (REP){
+  document.getElementById('hizbar').style.display = 'none'; document.getElementById('repbar').style.display = 'flex';
+  const lv = document.querySelector('.live'); lv.classList.add('gecmis'); lv.innerHTML = '<i></i>GEÇMİŞ · ' + esc(F.replay.gun);
+  document.getElementById('k3a').textContent = 'Son 10 dk sevk satırı'; document.getElementById('k3c').textContent = 'gerçek sevkiyat kaydı';
+  document.getElementById('k4a').textContent = 'Gün toplamı (satır)'; document.getElementById('rs').max = Math.round(F.replay.t1 - F.replay.t0) - 1;
+  document.getElementById('legend').innerHTML += '<span style="flex-basis:100%">Olaylar, kamyonlar ve kapı doluluğu gerçek kayıtlardır; araç hareketleri simülasyondur.</span>';
+  document.getElementById('rp').onclick = e => { repOynat = !repOynat; e.target.textContent = repOynat ? '⏸ Duraklat' : '▶ Oynat'; e.target.classList.toggle('on', repOynat); };
+  document.querySelectorAll('button[data-r]').forEach(b => b.onclick = () => { repHiz = +b.dataset.r; document.querySelectorAll('button[data-r]').forEach(x => x.classList.remove('on')); b.classList.add('on'); });
+  document.getElementById('rs').oninput = e => repSar(F.replay.t0 + (+e.target.value));
+  repSar(repT);
+}
+requestAnimationFrame(dongu);
+</script>
+</body>
+</html>
